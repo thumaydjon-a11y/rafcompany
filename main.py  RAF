@@ -1,0 +1,357 @@
+ƙ            phone TEXT PRIMARY KEY,
+            name TEXT,
+            points INTEGER
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
+            quantity INTEGER,
+            total_price REAL,
+            sale_date TEXT
+        )
+    """)
+    
+    cursor.execute("SELECT COUNT(*) FROM products")
+    if cursor.fetchone()[0] == 0:
+        sample_products = [
+            ("Блендер RAF R.281", "Кухня", 350.0, 10, "", "Мощный блендер для дома"),
+            ("Электрочайник RAF R.788", "Кухня", 220.0, 15, "", "Стеклянный чайник с подсветкой"),
+            ("Обогреватель RAF R.118", "Климат", 650.0, 5, "", "Быстрый обогрев помещения")
+        ]
+        cursor.executemany(
+            "INSERT INTO products (name, category, price, stock, image_url, description) VALUES (?, ?, ?, ?, ?, ?)",
+            sample_products
+        )
+        
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def get_db():
+    conn = sqlite3.connect("raf_store.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return """
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>RAF market Dushanbe</title>
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+            :root {
+                --bg-color: #050505;
+                --card-bg: rgba(18, 18, 18, 0.7);
+                --accent: #ff6600;
+                --text-main: #f3f4f6;
+                --text-muted: #9ca3af;
+                --border-color: rgba(255, 102, 0, 0.25);
+            }
+            body.theme-cyber {
+                --bg-color: #030712;
+                --card-bg: rgba(15, 23, 42, 0.75);
+                --accent: #38bdf8;
+                --border-color: rgba(56, 189, 248, 0.3);
+            }
+            body.theme-emerald {
+                --bg-color: #022c22;
+                --card-bg: rgba(6, 78, 59, 0.6);
+                --accent: #34d399;
+                --border-color: rgba(52, 211, 153, 0.3);
+            }
+            body {
+                background-color: var(--bg-color); color: var(--text-main);
+                min-height: 100vh; display: flex; flex-direction: column;
+                justify-content: space-between; overflow-x: hidden; position: relative;
+            }
+            #particle-canvas {
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+                background: linear-gradient(135deg, var(--bg-color), #0a0a0a);
+            }
+            .header {
+                padding: 20px; text-align: center; background: rgba(10, 10, 10, 0.8);
+                backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color);
+            }
+            .header h1 { font-size: 26px; color: var(--accent); margin-bottom: 4px; font-weight: 800; }
+            .header p { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; }
+            .container { padding: 20px; max-width: 600px; margin: 0 auto; width: 100%; margin-bottom: 100px; z-index: 1; flex: 1; }
+            .tab-content { display: none; }
+            .tab-content.active { display: block; }
+            .input-field, textarea.input-field, select.input-field {
+                width: 100%; padding: 12px 16px; border-radius: 12px;
+                background: var(--card-bg); border: 1px solid var(--border-color);
+                color: var(--text-main); font-size: 14px; margin-bottom: 12px; outline: none;
+            }
+            select.input-field option { background: #111; color: #fff; }
+            .action-btn {
+                width: 100%; padding: 12px; border-radius: 12px; border: none;
+                background: var(--accent); color: #000; font-weight: 700; font-size: 14px; cursor: pointer;
+            }
+            .search-bar {
+                width: 100%; padding: 12px 16px; border-radius: 12px;
+                background: var(--card-bg); border: 1px solid var(--border-color);
+                color: var(--text-main); font-size: 14px; margin-bottom: 15px; outline: none;
+            }
+            .categories { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; }
+            .categories::-webkit-scrollbar { display: none; }
+            .cat-chip {
+                background: var(--card-bg); border: 1px solid var(--border-color);
+                color: var(--text-muted); padding: 6px 14px; border-radius: 20px;
+                font-size: 12px; white-space: nowrap; cursor: pointer;
+            }
+            .cat-chip.active { background: var(--accent); color: #000; font-weight: 600; border-color: var(--accent); }
+            .card {
+                background: var(--card-bg); backdrop-filter: blur(16px);
+                border: 1px solid var(--border-color); border-radius: 18px;
+                overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+                position: relative; margin-bottom: 16px;
+            }
+            .product-img { width: 100%; height: 160px; object-fit: cover; background: #111; border-bottom: 1px solid var(--border-color); }
+            .card-body { padding: 16px; }
+            .card h3 { font-size: 17px; margin-bottom: 6px; color: var(--text-main); }
+            .card p { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+            .price { font-weight: 700; color: var(--accent); font-size: 17px; }
+            .fav-btn {
+                position: absolute; top: 12px; right: 12px; background: rgba(0, 0, 0, 0.6);
+                border: 1px solid var(--border-color); border-radius: 50%; width: 36px; height: 36px;
+                display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; z-index: 2;
+            }
+            .fav-btn.active { color: #ef4444; border-color: #ef4444; }
+            .fav-btn svg { width: 18px; height: 18px; fill: currentColor; }
+            .stat-box {
+                background: rgba(255,102,0,0.08); border: 1px solid var(--border-color);
+                padding: 14px; border-radius: 12px; margin-bottom: 12px;
+            }
+            .stat-box h4 { font-size: 14px; color: var(--accent); margin-bottom: 4px; }
+            .stat-box p { font-size: 18px; font-weight: bold; color: var(--text-main); }
+            .nav-bar {
+                position: fixed; bottom: 15px; left: 15px; right: 15px; height: 70px;
+                background: rgba(15, 15, 15, 0.65); backdrop-filter: blur(25px);
+                border: 1px solid var(--border-color); border-radius: 24px;
+                display: flex; justify-content: space-around; align-items: center; z-index: 10;
+            }
+            .nav-item {
+                color: var(--text-muted); text-decoration: none; font-size: 10px;
+                display: flex; flex-direction: column; align-items: center; cursor: pointer;
+            }
+            .nav-item.active { color: var(--accent); }
+            .nav-item svg { width: 20px; height: 20px; margin-bottom: 3px; fill: currentColor; }
+        </style>
+    </head>
+    <body>
+        <canvas id="particle-canvas"></canvas>
+        <div class="header">
+            <h1>RAF market</h1>
+            <p>Фирменный маркетплейс • Душанбе</p>
+        </div>
+        <div class="container">
+            <div id="tab-catalog" class="tab-content active">
+                <input type="text" class="search-bar" id="search-input" placeholder="Поиск техники RAF..." oninput="filterProducts()">
+                <div class="categories" id="categories-container">
+                    <div class="cat-chip active" onclick="setCategory('all', this)">Все</div>
+                    <div class="cat-chip" onclick="setCategory('Кухня', this)">Кухня</div>
+                    <div class="cat-chip" onclick="setCategory('Климат', this)">Климат</div>
+                </div>
+                <div class="product-grid" id="product-list">
+                    <div class="card"><div class="card-body"><h3>Загрузка каталога...</h3></div></div>
+                </div>
+            </div>
+            <div id="tab-cart" class="tab-content">
+                <h2 style="font-size: 18px; margin-bottom: 15px; color: var(--accent);">Корзина заказов</h2>
+                <div class="product-grid" id="cart-list">
+                    <div class="card"><div class="card-body"><p style="color: var(--text-muted);">Ваша корзина пуста</p></div></div>
+                </div>
+                <div id="cart-checkout-section" style="display: none; margin-top: 20px;">
+                    <div class="card">
+                        <div class="card-body">
+                            <h3 style="margin-bottom: 12px; color: var(--accent);">Оформление заказа</h3>
+                            <input type="text" id="order-name" class="input-field" placeholder="Ваше имя">
+                            <input type="text" id="order-phone" class="input-field" placeholder="Номер телефона (+992...)">
+                            <textarea id="order-address" class="input-field" placeholder="Адрес доставки в Душанбе" rows="2"></textarea>
+                            <p style="margin-bottom: 10px; font-size: 14px;">Итого: <b id="cart-total-price" style="color: var(--accent);">0 сомони</b></p>
+                            <select id="payment-method" class="input-field" onchange="togglePaymentDetails()">
+                                <option value="dc">QR Dushanbe City (970 66 44 88)</option>
+                                <option value="whatsapp">Через WhatsApp</option>
+                                <option value="cash">Наличными</option>
+                            </select>
+                            <button class="action-btn" onclick="checkoutOrder()">Подтвердить заказ</button>
+                            <p id="checkout-msg" style="margin-top: 8px; font-size: 13px;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="tab-favorites" class="tab-content">
+                <h2 style="font-size: 18px; margin-bottom: 15px; color: var(--accent);">Избранное</h2>
+                <div class="product-grid" id="favorites-list"><div class="card"><div class="card-body"><p>Пусто</p></div></div></div>
+            </div>
+            <div id="tab-profile" class="tab-content">
+                <h2 style="font-size: 18px; margin-bottom: 15px; color: var(--accent);">Профиль</h2>
+                <div class="card"><div class="card-body" id="profile-card-body">
+                    <input type="text" id="reg-name" class="input-field" placeholder="Имя">
+                    <input type="text" id="reg-phone" class="input-field" placeholder="Телефон">
+                    <button class="action-btn" onclick="registerUser()">Регистрация</button>
+                    <p id="reg-message" style="margin-top:10px;"></p>
+                </div></div>
+            </div>
+            <div id="tab-settings" class="tab-content">
+                <h2 style="font-size: 18px; margin-bottom: 15px; color: var(--accent);">Настройки</h2>
+                <div class="card" style="margin-bottom: 20px;"><div class="card-body">
+                    <div style="display: flex; gap: 10px;">
+                        <div onclick="setTheme('orange', this)" style="flex:1; padding:10px; background:var(--card-bg); border:1px solid var(--border-color); text-align:center; border-radius:10px; cursor:pointer;">Оранж</div>
+                        <div onclick="setTheme('cyber', this)" style="flex:1; padding:10px; background:var(--card-bg); border:1px solid var(--border-color); text-align:center; border-radius:10px; cursor:pointer;">Кибер</div>
+                        <div onclick="setTheme('emerald', this)" style="flex:1; padding:10px; background:var(--card-bg); border:1px solid var(--border-color); text-align:center; border-radius:10px; cursor:pointer;">Изумруд</div>
+                    </div>
+                </div></div>
+                <div id="admin-auth-container" class="card"><div class="card-body">
+                    <h3 style="color:var(--accent); margin-bottom:10px;">Админ-панель</h3>
+                    <input type="text" id="admin-login" class="input-field" placeholder="Логин">
+                    <input type="password" id="admin-pass" class="input-field" placeholder="Пароль">
+                    <button class="action-btn" onclick="loginAdmin()">Войти</button>
+                    <p id="admin-auth-msg" style="margin-top:8px;"></p>
+                </div></div>
+                <div id="admin-panel-content" style="display: none;">
+                    <div class="card"><div class="card-body">
+                        <h3 style="color:var(--accent); margin-bottom:10px;">Управление</h3>
+                        <input type="text" id="adm-name" class="input-field" placeholder="Название">
+                        <input type="text" id="adm-cat" class="input-field" placeholder="Категория">
+                        <input type="number" id="adm-price" class="input-field" placeholder="Цена">
+                        <input type="number" id="adm-stock" class="input-field" placeholder="Сток">
+                        <input type="text" id="adm-img" class="input-field" placeholder="Фото URL">
+                        <textarea id="adm-desc" class="input-field" placeholder="Описание"></textarea>
+                        <button class="action-btn" onclick="addProduct()">Добавить товар</button>
+                        <p id="adm-msg" style="margin-top:8px;"></p>
+                    </div></div>
+                </div>
+            </div>
+        </div>
+        <div class="nav-bar">
+            <div class="nav-item active" onclick="switchTab('catalog', this)"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Каталог</div>
+            <div class="nav-item" onclick="switchTab('cart', this)"><svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>Корзина</div>
+            <div class="nav-item" onclick="switchTab('favorites', this)"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Избранное</div>
+            <div class="nav-item" onclick="switchTab('profile', this)"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Профиль</div>
+            <div class="nav-item" onclick="switchTab('settings', this)"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>Настройки</div>
+        </div>
+        <script>
+            let allProducts = [];
+            let currentCategory = 'all';
+            function switchTab(tabId, element) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                document.getElementById('tab-' + tabId).classList.add('active');
+                element.classList.add('active');
+                if (tabId === 'cart') loadCart();
+            }
+            function setTheme(themeName) {
+                document.body.className = '';
+                if (themeName === 'cyber') document.body.classList.add('theme-cyber');
+                if (themeName === 'emerald') document.body.classList.add('theme-emerald');
+            }
+            function loginAdmin() {
+                if (document.getElementById('admin-login').value === 'ali' && document.getElementById('admin-pass').value === 'RAF.2026-2026') {
+                    localStorage.setItem('raf_admin', 'true');
+                    document.getElementById('admin-auth-container').style.display = 'none';
+                    document.getElementById('admin-panel-content').style.display = 'block';
+                } else { alert('Неверно'); }
+            }
+            async function loadProducts() {
+                const res = await fetch('/products');
+                const data = await res.json();
+                allProducts = data.products;
+                renderProducts(allProducts);
+            }
+            function renderProducts(products) {
+                const container = document.getElementById('product-list');
+                container.innerHTML = '';
+                if (products.length === 0) { container.innerHTML = '<div class="card"><div class="card-body"><h3>Нет товаров</h3></div></div>'; return; }
+                products.forEach(p => {
+                    container.innerHTML += `
+                        <div class="card">
+                            <img src="${p.image_url || 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80'}" class="product-img">
+                            <div class="card-body">
+                                <h3>${p.name}</h3>
+                                <p>${p.category}</p>
+                                <p class="price">${p.price} сомони</p>
+                                <button class="action-btn" onclick="addToCart(${p.id})">В корзину</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            function setCategory(cat, el) {
+                currentCategory = cat;
+                document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+                el.classList.add('active');
+                renderProducts(cat === 'all' ? allProducts : allProducts.filter(p => p.category.toLowerCase() === cat.toLowerCase()));
+            }
+            function addToCart(id) {
+                let cart = JSON.parse(localStorage.getItem('raf_cart') || '{}');
+                cart[id] = (cart[id] || 0) + 1;
+                localStorage.setItem('raf_cart', JSON.stringify(cart));
+                alert('Добавлено!');
+            }
+            function loadCart() {
+                const cart = JSON.parse(localStorage.getItem('raf_cart') || '{}');
+                const container = document.getElementById('cart-list');
+                container.innerHTML = '';
+                let total = 0;
+                const keys = Object.keys(cart);
+                if (keys.length === 0) { container.innerHTML = '<div class="card"><div class="card-body"><p>Пусто</p></div></div>'; document.getElementById('cart-checkout-section').style.display='none'; return; }
+                keys.forEach(id => {
+                    const p = allProducts.find(item => item.id == id);
+                    if (p) {
+                        total += p.price * cart[id];
+                        container.innerHTML += `<div class="card"><div class="card-body"><h3>${p.name}</h3><p>${p.price} сом x ${cart[id]}</p></div></div>`;
+                    }
+                });
+                document.getElementById('cart-total-price').innerText = total + ' сомони';
+                document.getElementById('cart-checkout-section').style.display = 'block';
+            }
+            async function addProduct() {
+                const name = document.getElementById('adm-name').value;
+                const category = document.getElementById('adm-cat').value;
+                const price = parseFloat(document.getElementById('adm-price').value);
+                const stock = parseInt(document.getElementById('adm-stock').value);
+                await fetch('/products', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, category, price, stock}) });
+                alert('Добавлено!');
+                loadProducts();
+            }
+            loadProducts();
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/products")
+def get_products():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM products")
+    products = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return {"products": products}
+
+from pydantic import BaseModel
+class ProductCreate(BaseModel):
+    name: str
+    category: str
+    price: float
+    stock: int
+    image_url: str = ""
+    description: str = ""
+
+@app.post("/products")
+def add_product(p: ProductCreate):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO products (name, category, price, stock, image_url, description) VALUES (?, ?, ?, ?, ?, ?)", (p.name, p.category, p.price, p.stock, p.image_url, p.description))
+    conn.commit()
+    conn.close()
+    return {"message": "OK"}
+
