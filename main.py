@@ -1,9 +1,15 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import sqlite3
 
 app = FastAPI(title="RAF Market & Admin API")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/manifest.json")
+async def get_manifest():
+    return FileResponse("manifest.json")
 def init_db():
     conn = sqlite3.connect("raf_store.db")
     cursor = conn.cursor()
