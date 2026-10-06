@@ -65,10 +65,13 @@ def read_root():
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title id="pageTitle">RAF market — Бытовая техника в Таджикистане</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">RAF market — Бытовая техника в Таджикистане</title>
+    <meta name="description" content="Официальный сайт RAF в Таджикистане. Бытовая техника, товары и услуги." />
+    <meta name="keywords" content="Raf Таджикистан, раф, raf company, бытовая техника таджикистан" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
   <style>
     :root {
       --bg-main: #070707;
