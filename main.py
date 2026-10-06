@@ -68,7 +68,8 @@ def read_root():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="pageTitle">RAF market — Бытовая техника в Таджикистане</title>
-    <meta name="description" content="Официальный сайт RAF в Таджикистане. Бытовая техника, товары и услуги." />
+    <meta name="description" content="Официальный сайт RAF в Таджикистане. Бытовая техника, товары и услуги." /> 
+<meta name="google-site-verification" content="qQ7EKBQOGJayIkzUGiJl9SdiSmNZ4-s29MlSxMFN1LU" />
     <meta name="keywords" content="Raf Таджикистан, раф, raf company, бытовая техника таджикистан" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
